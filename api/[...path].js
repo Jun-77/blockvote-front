@@ -12,6 +12,7 @@ export default async function handler(req, res) {
     const qs = qsIndex !== -1 ? req.url.substring(qsIndex) : '';
 
     const target = `${base.replace(/\/+$/, '')}/api/${subPath}${qs}`;
+    console.log('[proxy] incoming', { method: req.method, path: req.url, target });
 
     const fwdHeaders = { ...req.headers };
     delete fwdHeaders.host;
@@ -50,7 +51,7 @@ export default async function handler(req, res) {
     const buf = Buffer.from(await resp.arrayBuffer());
     res.status(resp.status).end(buf);
   } catch (err) {
+    console.error('[proxy] error', err);
     res.status(502).json({ success: false, message: 'Upstream proxy error', error: String(err && err.message || err) });
   }
 }
-
