@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import VoteCard from '../components/VoteCard';
 import { voteAPI } from '../api/client';
@@ -10,20 +10,14 @@ export default function VoteList() {
   const [votes, setVotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (account) {
-      fetchVotes();
-    }
-  }, [account]);
+  const fetchVotes = useCallback(async () => {
+    if (!account) return;
 
-  const fetchVotes = async () => {
     try {
       setLoading(true);
       const data = await voteAPI.getAvailable(account);
-      console.log('getAvailable response:', data);
 
       const votesArray = data?.votes || data?.data?.votes || [];
-      console.log('Votes array:', votesArray);
 
       const formattedVotes = votesArray.map((vote) => ({
         id: vote.id,
@@ -39,7 +33,6 @@ export default function VoteList() {
         hasVoted: !!vote.hasVoted,
         hasAccess: vote.hasAccess !== undefined ? vote.hasAccess : true,
       }));
-      console.log('Formatted votes:', formattedVotes);
       setVotes(formattedVotes);
     } catch (error) {
       console.error('Failed to fetch votes:', error);
@@ -47,7 +40,11 @@ export default function VoteList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [account]);
+
+  useEffect(() => {
+    fetchVotes();
+  }, [fetchVotes]);
 
   const filteredVotes = votes.filter((vote) => {
     // 탭 필터

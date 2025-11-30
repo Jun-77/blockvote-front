@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -9,13 +9,9 @@ export default function AdminDashboard() {
   const [votes, setVotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (isAdmin) {
-      fetchVotes();
-    }
-  }, [isAdmin]);
+  const fetchVotes = useCallback(async () => {
+    if (!isAdmin) return;
 
-  const fetchVotes = async () => {
     try {
       setLoading(true);
       const data = await voteAPI.getAll();
@@ -25,7 +21,11 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin]);
+
+  useEffect(() => {
+    fetchVotes();
+  }, [fetchVotes]);
 
   if (!isAdmin) {
     return (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
@@ -13,33 +13,24 @@ export default function OrgAdminDashboard() {
   const [creditAmount, setCreditAmount] = useState('');
   const [showCreditModal, setShowCreditModal] = useState(false);
 
-  useEffect(() => {
-    if (isOrgAdmin) {
-      fetchData();
-    }
-  }, [isOrgAdmin, location.key]); // location.key가 변경되면 새로고침
+  const fetchData = useCallback(async () => {
+    if (!isOrgAdmin) return;
 
-  const fetchData = async () => {
     try {
       setLoading(true);
       // 내 기관 정보 조회
       const response = await organizationAPI.getMine();
-      console.log('getMine response:', response);
 
       const organizations = response?.organizations || response?.data?.organizations || [];
-      console.log('organizations:', organizations);
 
       if (organizations && organizations.length > 0) {
         const myOrg = organizations[0];
         setOrganization(myOrg);
-        console.log('My organization:', myOrg);
 
         // 내 기관의 투표 목록 조회
         const votesResponse = await organizationAPI.getVotes(myOrg.id);
-        console.log('getVotes response:', votesResponse);
 
         const orgVotes = votesResponse?.votes || votesResponse?.data?.votes || [];
-        console.log('Votes:', orgVotes);
         setVotes(orgVotes);
       }
     } catch (error) {
@@ -47,7 +38,11 @@ export default function OrgAdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isOrgAdmin]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData, location.key]); // location.key가 변경되면 새로고침
 
   const handleCreditCharge = async () => {
     if (!organization || !creditAmount || parseFloat(creditAmount) <= 0) {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { userAPI, authAPI } from '../api/client';
 
@@ -24,10 +24,21 @@ export const AuthProvider = ({ children }) => {
     checkConnection();
   }, []);
 
+  // Choose MetaMask provider if multiple are injected
+  const getMetaMaskProvider = () => {
+    const eth = window.ethereum;
+    if (!eth) return null;
+    if (Array.isArray(eth?.providers)) {
+      return eth.providers.find((p) => p && p.isMetaMask) || null;
+    }
+    return eth?.isMetaMask ? eth : null;
+  };
+
   const checkConnection = async () => {
-    if (window.ethereum) {
+    const mm = getMetaMaskProvider();
+    if (mm) {
       try {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        const accounts = await mm.request({ method: 'eth_accounts' });
         if (accounts.length > 0) {
           const currentAccount = accounts[0];
           const savedToken = localStorage.getItem('token');
@@ -42,7 +53,7 @@ export const AuthProvider = ({ children }) => {
             setIsAdmin(savedIsAdmin);
             setIsOrgAdmin(savedIsOrgAdmin);
 
-            const newProvider = new ethers.BrowserProvider(window.ethereum);
+            const newProvider = new ethers.BrowserProvider(mm);
             const newSigner = await newProvider.getSigner();
             setProvider(newProvider);
             setSigner(newSigner);
@@ -58,12 +69,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const connectWallet = async () => {
-    if (!window.ethereum) {
+    const mm = getMetaMaskProvider();
+    if (!mm) {
       alert('MetaMask를 설치해 주세요!');
       return;
     }
     try {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const accounts = await mm.request({ method: 'eth_requestAccounts' });
       handleAccountsChanged(accounts);
     } catch (error) {
       console.error('Error connecting wallet:', error);
@@ -71,7 +83,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const handleAccountsChanged = async (accounts) => {
+  const handleAccountsChanged = useCallback(async (accounts) => {
     if (accounts.length === 0) {
       setAccount(null);
       setIsAdmin(false);
@@ -83,68 +95,66 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('account');
       localStorage.removeItem('isAdmin');
       localStorage.removeItem('isOrgAdmin');
-    } else {
-      const newAccount = accounts[0];
-      setAccount(newAccount);
+      return;
+    }
 
-      const newProvider = new ethers.BrowserProvider(window.ethereum);
+    const newAccount = accounts[0];
+    setAccount(newAccount);
+
+    const savedAccount = localStorage.getItem('account');
+    const savedToken = localStorage.getItem('token');
+    const mm = getMetaMaskProvider();
+    if (!mm) return;
+
+    // 같은 계정이고 토큰이 있으면 재사용
+    if (savedAccount && savedToken && savedAccount.toLowerCase() === newAccount.toLowerCase()) {
+      const newProvider = new ethers.BrowserProvider(mm);
       const newSigner = await newProvider.getSigner();
       setProvider(newProvider);
       setSigner(newSigner);
-
-      // 로그인: 서버에서 nonce 받아 서명 후 JWT 발급
-      try {
-        const { message } = await authAPI.requestNonce(newAccount);
-        const signature = await newSigner.signMessage(message);
-        const response = await authAPI.verifySignature(newAccount, signature, message);
-
-        console.log('verifySignature response:', response);
-        const { token: jwtToken, user } = response;
-        console.log('JWT Token:', jwtToken);
-        console.log('User data:', user);
-
-        // 토큰과 계정 정보 저장
-        localStorage.setItem('token', jwtToken);
-        localStorage.setItem('account', newAccount);
-        setToken(jwtToken);
-
-        // 권한 구분
-        // user.isAdmin = true, adminOrganizationId = null → 전역 관리자
-        // user.isAdmin = true, adminOrganizationId = 숫자 → 기관 관리자
-        let adminStatus = false;
-        let orgAdminStatus = false;
-
-        console.log('Checking permissions...');
-        console.log('user.isAdmin:', user.isAdmin);
-        console.log('user.adminOrganizationId:', user.adminOrganizationId);
-
-        if (user.isAdmin && !user.adminOrganizationId) {
-          adminStatus = true;
-          orgAdminStatus = false;
-          console.log('Set as Super Admin');
-        } else if (user.isAdmin && user.adminOrganizationId) {
-          adminStatus = false;
-          orgAdminStatus = true;
-          console.log('Set as Org Admin');
-        } else {
-          console.log('Set as Regular User');
-        }
-
-        setIsAdmin(adminStatus);
-        setIsOrgAdmin(orgAdminStatus);
-        localStorage.setItem('isAdmin', String(adminStatus));
-        localStorage.setItem('isOrgAdmin', String(orgAdminStatus));
-
-        console.log('Final state - isAdmin:', adminStatus, 'isOrgAdmin:', orgAdminStatus);
-
-        // 사용자 등록(백엔드에서 자동 생성되지만 안전하게 호출)
-        await userAPI.register(newAccount);
-      } catch (error) {
-        console.error('로그인 실패:', error);
-        alert(error.message || '로그인에 실패했습니다.');
-      }
+      setToken(savedToken);
+      const savedIsAdmin = localStorage.getItem('isAdmin') === 'true';
+      const savedIsOrgAdmin = localStorage.getItem('isOrgAdmin') === 'true';
+      setIsAdmin(savedIsAdmin);
+      setIsOrgAdmin(savedIsOrgAdmin);
+      return;
     }
-  };
+
+    // 새 계정 로그인
+    const newProvider = new ethers.BrowserProvider(mm);
+    const newSigner = await newProvider.getSigner();
+    setProvider(newProvider);
+    setSigner(newSigner);
+
+    try {
+      const { message } = await authAPI.requestNonce(newAccount);
+      const signature = await newSigner.signMessage(message);
+      const response = await authAPI.verifySignature(newAccount, signature, message);
+
+      const { token: jwtToken, user } = response;
+
+      localStorage.setItem('token', jwtToken);
+      localStorage.setItem('account', newAccount);
+      setToken(jwtToken);
+
+      // 권한 구분
+      // user.isAdmin = true, adminOrganizationId = null → 전역 관리자
+      // user.isAdmin = true, adminOrganizationId = 숫자 → 기관 관리자
+      const adminStatus = user.isAdmin && !user.adminOrganizationId;
+      const orgAdminStatus = user.isAdmin && !!user.adminOrganizationId;
+
+      setIsAdmin(adminStatus);
+      setIsOrgAdmin(orgAdminStatus);
+      localStorage.setItem('isAdmin', String(adminStatus));
+      localStorage.setItem('isOrgAdmin', String(orgAdminStatus));
+
+      // 사용자 등록(백엔드에서 자동 생성되지만 안전하게 호출)
+      await userAPI.register(newAccount);
+    } catch (error) {
+      console.error('로그인 실패:', error);
+      alert(error.message || '로그인에 실패했습니다.');
+    }
+  }, []);
 
   const disconnectWallet = () => {
     setAccount(null);
@@ -159,15 +169,14 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('isOrgAdmin');
   };
 
-  // MetaMask 계정 변경 이벤트
   useEffect(() => {
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-      };
-    }
-  }, []);
+    const mm = getMetaMaskProvider();
+    if (!mm) return;
+    mm.on('accountsChanged', handleAccountsChanged);
+    return () => {
+      mm.removeListener('accountsChanged', handleAccountsChanged);
+    };
+  }, [handleAccountsChanged]);
 
   const value = {
     account,

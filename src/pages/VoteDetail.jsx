@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { voteAPI } from '../api/client';
@@ -13,13 +13,9 @@ export default function VoteDetail() {
   const [vote, setVote] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (account) {
-      fetchVoteDetail();
-    }
-  }, [id, account]);
+  const fetchVoteDetail = useCallback(async () => {
+    if (!account || !id) return;
 
-  const fetchVoteDetail = async () => {
     try {
       setLoading(true);
       const data = await voteAPI.getById(id, account);
@@ -66,7 +62,11 @@ export default function VoteDetail() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, account]);
+
+  useEffect(() => {
+    fetchVoteDetail();
+  }, [fetchVoteDetail]);
 
   const handleVote = async () => {
     if (!selectedOption) {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { organizationAPI } from '../api/client';
 
@@ -16,13 +16,9 @@ export default function OrganizationRegister() {
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (isAdmin) {
-      fetchOrganizations();
-    }
-  }, [isAdmin]);
+  const fetchOrganizations = useCallback(async () => {
+    if (!isAdmin) return;
 
-  const fetchOrganizations = async () => {
     try {
       setLoading(true);
       const data = await organizationAPI.getAll();
@@ -33,7 +29,11 @@ export default function OrganizationRegister() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin]);
+
+  useEffect(() => {
+    fetchOrganizations();
+  }, [fetchOrganizations]);
 
   if (!isAdmin) {
     return (

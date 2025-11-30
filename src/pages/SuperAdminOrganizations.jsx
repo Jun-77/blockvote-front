@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { organizationAPI } from '../api/client';
@@ -10,20 +10,21 @@ export default function SuperAdminOrganizations() {
   const [savingId, setSavingId] = useState(null);
   const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    const run = async () => {
-      try {
-        setLoading(true);
-        const data = await organizationAPI.getAll();
-        setOrgs(data.organizations || data?.data?.organizations || []);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    run();
+  const fetchOrganizations = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await organizationAPI.getAll();
+      setOrgs(data.organizations || data?.data?.organizations || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchOrganizations();
+  }, [fetchOrganizations]);
 
   if (!isAdmin) return <Navigate to="/votes" replace />;
 
