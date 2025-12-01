@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { voteAPI, organizationAPI } from '../api/client';
+import { voteAPI, organizationAPI } from '../client/client';
 
 export default function OrgAdminDashboard() {
   const { isOrgAdmin } = useAuth();

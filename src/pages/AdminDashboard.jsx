@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { voteAPI } from '../api/client';
+import { voteAPI } from '../client/client';
 
 export default function AdminDashboard() {
   const { isAdmin } = useAuth();

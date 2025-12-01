@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { organizationAPI } from '../api/client';
+import { organizationAPI } from '../client/client';
 
 export default function OrganizationRegister() {
   const { isAdmin } = useAuth();
