@@ -6,10 +6,19 @@ export default async function handler(req, res) {
       return;
     }
 
-    const captured = req.query.path;
-    const subPath = Array.isArray(captured) ? captured.join('/') : (captured || '');
+    // Extract the full path after /api/
+    const urlWithoutQuery = req.url.split('?')[0];
+    const subPath = urlWithoutQuery.replace(/^\/api\//, '');
+
+    // Extract query string, excluding Vercel's internal ...path parameter
+    let qs = '';
     const qsIndex = req.url.indexOf('?');
-    const qs = qsIndex !== -1 ? req.url.substring(qsIndex) : '';
+    if (qsIndex !== -1) {
+      const params = new URLSearchParams(req.url.substring(qsIndex));
+      params.delete('...path'); // Remove Vercel's catch-all parameter
+      const queryStr = params.toString();
+      qs = queryStr ? `?${queryStr}` : '';
+    }
 
     const target = `${base.replace(/\/+$/, '')}/api/${subPath}${qs}`;
     console.log('[proxy] incoming', { method: req.method, path: req.url, target });
