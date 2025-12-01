@@ -6,22 +6,21 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Extract the full path after /api/
-    const urlWithoutQuery = req.url.split('?')[0];
-    const subPath = urlWithoutQuery.replace(/^\/api\//, '');
+    // Correct catch-all usage: Vercel stores segments in req.query.path
+    const segments = Array.isArray(req.query.path)
+      ? req.query.path
+      : [req.query.path].filter(Boolean);
 
-    // Extract query string, excluding Vercel's internal ...path parameter
-    let qs = '';
-    const qsIndex = req.url.indexOf('?');
-    if (qsIndex !== -1) {
-      const params = new URLSearchParams(req.url.substring(qsIndex));
-      params.delete('...path'); // Remove Vercel's catch-all parameter
-      const queryStr = params.toString();
-      qs = queryStr ? `?${queryStr}` : '';
-    }
+    const subPath = segments.join('/');
+
+    // Extract user-defined query params (but remove Vercel internals)
+    const params = new URLSearchParams(req.query);
+    params.delete('path'); // remove Vercel catch-all param
+
+    const qs = params.toString() ? `?${params.toString()}` : '';
 
     const target = `${base.replace(/\/+$/, '')}/api/${subPath}${qs}`;
-    console.log('[proxy] incoming', { method: req.method, path: req.url, target });
+    console.log('[proxy] incoming', { method: req.method, raw: req.url, subPath, target });
 
     const fwdHeaders = { ...req.headers };
     delete fwdHeaders.host;
@@ -31,16 +30,12 @@ export default async function handler(req, res) {
 
     let body;
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      if (req.body !== undefined && req.body !== null) {
-        body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-      } else {
-        body = await new Promise((resolve, reject) => {
-          const chunks = [];
-          req.on('data', (c) => chunks.push(c));
-          req.on('end', () => resolve(Buffer.concat(chunks)));
-          req.on('error', reject);
-        });
-      }
+      body = await new Promise((resolve, reject) => {
+        const chunks = [];
+        req.on('data', (c) => chunks.push(c));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', reject);
+      });
     }
 
     const resp = await fetch(target, {
@@ -49,11 +44,10 @@ export default async function handler(req, res) {
       body,
     });
 
-    // Forward headers except hop-by-hop
     resp.headers.forEach((value, key) => {
       const k = key.toLowerCase();
-      if (k === 'content-length' || k === 'transfer-encoding' || k === 'connection' || k === 'content-encoding') return;
-      if (k === 'set-cookie') return; // handled by platform, avoid duplication
+      if (['content-length', 'transfer-encoding', 'connection', 'content-encoding'].includes(k)) return;
+      if (k === 'set-cookie') return;
       res.setHeader(key, value);
     });
 
