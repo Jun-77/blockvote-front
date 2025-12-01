@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { organizationAPI } from '../api/client';
+import { organizationAPI } from '../client/client';
 
 export default function SuperAdminOrganizations() {
   const { isAdmin } = useAuth();

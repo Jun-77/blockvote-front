@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
-import { userAPI, authAPI } from '../api/client';
+import { userAPI, authAPI } from '../client/client';
 
 const AuthContext = createContext();
 

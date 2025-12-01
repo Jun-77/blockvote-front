@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import VoteCard from '../components/VoteCard';
-import { voteAPI } from '../api/client';
+import { voteAPI } from '../client/client';
 
 export default function VoteList() {
   const { account } = useAuth();
